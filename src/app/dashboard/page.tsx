@@ -1,48 +1,48 @@
 import { auth } from "@/lib/auth";
-import { getDashboardInsights } from "@/lib/dashboard-insights";
-import { DashboardHero } from "@/components/dashboard/dashboard-hero";
-import { BalanceOverview } from "@/components/dashboard/balance-overview";
-import { IncomeExpenseChart } from "@/components/dashboard/income-expense-chart";
-import { SavingsTracker } from "@/components/dashboard/savings-tracker";
-import { InvestmentSummary } from "@/components/dashboard/investment-summary";
-import { FinancialGoals } from "@/components/dashboard/financial-goals";
-import { RecentTransactions } from "@/components/dashboard/recent-transactions";
+import { getDashboardData } from "@/lib/dashboard-data-server";
+import { FinancialAnalysis } from "@/components/dashboard/financial-analysis";
+import { AICenter } from "@/components/dashboard/ai-center";
+import { Discoveries } from "@/components/dashboard/discoveries";
+import { Goals } from "@/components/dashboard/goals";
+import { Subscriptions } from "@/components/dashboard/subscriptions";
 
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id;
 
-  let insights: Awaited<ReturnType<typeof getDashboardInsights>> = [];
+  let data = {
+    balance: 0,
+    previousBalance: 0,
+    monthlyIncome: 0,
+    monthlyExpenses: 0,
+    balanceInsight: "Conectá tu primer cuenta bancaria para ver tu análisis financiero.",
+    discoveries: [] as Awaited<ReturnType<typeof getDashboardData>>["discoveries"],
+    goals: [] as Awaited<ReturnType<typeof getDashboardData>>["goals"],
+    subscriptions: [] as Awaited<ReturnType<typeof getDashboardData>>["subscriptions"],
+  };
+
   if (userId) {
-    insights = await getDashboardInsights(userId);
+    data = await getDashboardData(userId);
   }
 
   return (
-    <div className="space-y-8">
-      <DashboardHero insights={insights} />
+    <div className="space-y-10 pb-12">
+      <FinancialAnalysis
+        balance={data.balance}
+        previousBalance={data.previousBalance}
+        monthlyIncome={data.monthlyIncome}
+        monthlyExpenses={data.monthlyExpenses}
+        insight={data.balanceInsight}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          <BalanceOverview />
-        </div>
-        <div className="lg:col-span-8">
-          <IncomeExpenseChart />
-        </div>
+      <AICenter />
+
+      <Discoveries discoveries={data.discoveries} />
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <Goals goals={data.goals} />
+        <Subscriptions subscriptions={data.subscriptions} />
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          <SavingsTracker />
-        </div>
-        <div className="lg:col-span-4">
-          <InvestmentSummary />
-        </div>
-        <div className="lg:col-span-4">
-          <FinancialGoals />
-        </div>
-      </div>
-
-      <RecentTransactions />
     </div>
   );
 }

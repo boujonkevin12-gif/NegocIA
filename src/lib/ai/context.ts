@@ -1,11 +1,58 @@
 import { prisma } from "@/lib/prisma";
 import type { AIMessage } from "./types";
 
+export type AdvisorType = "finance" | "investments" | "marketing" | "business" | "legal" | "accounting";
+
+const advisorPersonalities: Record<AdvisorType, string> = {
+  finance: `Sos el asesor de FINANZAS PERSONALES de NegocIA. Tu especialidad es ayudar a las personas a:
+- Analizar sus gastos e identificar dónde pueden ahorrar
+- Crear presupuestos personalizados
+- Planificar metas de ahorro
+- Entender su flujo de caja
+Sé directo, práctico y usá números concretos. Cuando des un consejo, calculá el impacto en pesos argentinos.`,
+
+  investments: `Sos el asesor de INVERSIONES de NegocIA. Tu especialidad es:
+- Analizar portfolios de acciones, bonos, CEDEARs, cripto y fondos
+- Evaluar riesgo y diversificación
+- Explicar instrumentos financieros
+- Recomendar estrategias según el perfil del usuario
+Sé analítico, mostrá porcentajes de variación, y siempre aclará que las inversiones tienen riesgo.`,
+
+  marketing: `Sos el asesor de MARKETING de NegocIA. Tu especialidad es:
+- Estrategias de marketing digital para negocios
+- Análisis de redes sociales y campañas
+- Posicionamiento y marca personal
+- Growth hacking y adquisición de clientes
+Sé creativo, proponé acciones concretas y medibles, y explicá el ROI esperado.`,
+
+  business: `Sos el asesor de NEGOCIOS de NegocIA. Tu especialidad es:
+- Análisis de viabilidad de negocios
+- P&L, márgenes y Unit Economics
+- Gestión de stock y proveedores
+- Benchmarking y competencia
+Hablá como un socio comercial inteligente. Analizá números, detectá oportunidades y riesgos.`,
+
+  legal: `Sos el asesor LEGAL de NegocIA. Tu especialidad es:
+- Tipos societarios (SAS, SRL, SA)
+- Regulaciones impositivas argentinas
+- Contratos y regulaciones laborales
+- Compliance y normativas
+Sé preciso pero accesible. Siempre aclará que no reemplazás un abogado real, pero podés orientar.`,
+
+  accounting: `Sos el asesor de CONTABILIDAD de NegocIA. Tu especialidad es:
+- Facturación A y B, IVA, ganancias
+- Conciliación bancaria
+- Balances y estados contables
+- Planning fiscal y deducciones
+Sé metódico, usá terminología contable correcta, y ayudá a entender las obligaciones fiscales.`,
+};
+
 export async function buildFinancialContext(
   userId: string,
-  history: { role: string; content: string }[]
+  history: { role: string; content: string }[],
+  advisor?: AdvisorType,
 ): Promise<AIMessage[]> {
-  const [transactions, investments] = await Promise.all([
+  const [transactions, investments, goals, subscriptions] = await Promise.all([
     prisma.transaction.findMany({
       where: { userId },
       orderBy: { date: "desc" },
@@ -31,6 +78,14 @@ export async function buildFinancialContext(
         currentPrice: true,
         currency: true,
       },
+    }),
+    prisma.goal.findMany({
+      where: { userId },
+      select: { name: true, icon: true, target: true, current: true },
+    }),
+    prisma.subscription.findMany({
+      where: { userId, active: true },
+      select: { name: true, amount: true, frequency: true, lastUsedAt: true },
     }),
   ]);
 
@@ -82,10 +137,27 @@ export async function buildFinancialContext(
     )
     .join("\n");
 
-  const systemPrompt = `Sos NegocIA, un asistente financiero inteligente especializado en ayudar a personas y negocios a gestionar su dinero, inversiones y finanzas personales.
+  const goalsSummary = goals
+    .map((g) => `  - ${g.icon} ${g.name}: $${Number(g.current).toLocaleString("es-AR")} / $${Number(g.target).toLocaleString("es-AR")} (${Number(g.target) > 0 ? Math.round((Number(g.current) / Number(g.target)) * 100) : 0}%)`)
+    .join("\n");
+
+  const subsSummary = subscriptions
+    .map((s) => {
+      const lastUsed = s.lastUsedAt
+        ? `Último uso: ${Math.floor((Date.now() - new Date(s.lastUsedAt).getTime()) / (1000 * 60 * 60 * 24))} días atrás`
+        : "Sin uso registrado";
+      return `  - ${s.name}: $${Number(s.amount).toLocaleString("es-AR")}/${s.frequency.toLowerCase()} (${lastUsed})`;
+    })
+    .join("\n");
+
+  const advisorPersonality = advisor
+    ? advisorPersonalities[advisor]
+    : advisorPersonalities.finance;
+
+  const systemPrompt = `${advisorPersonality}
 
 CONTEXTO FINANCIERO DEL USUARIO:
-═══════════════════════════════
+════════════════════════════════
 
 RESUMEN GENERAL:
   Ingresos totales del período: $${totalIncome.toLocaleString("es-AR")}
@@ -100,8 +172,21 @@ ${topExpenses || "  Sin datos de gastos"}
 INVERSIONES ACTIVAS:
 ${investmentSummary || "  Sin inversiones registradas"}
 
+OBJETIVOS:
+${goalsSummary || "  Sin objetivos definidos"}
+
+SUSCRIPCIONES:
+${subsSummary || "  Sin suscripciones registradas"}
+
 ÚLTIMAS TRANSACCIONES:
-${recentTransactions || "  Sin transacciones recientes"}`;
+${recentTransactions || "  Sin transacciones recientes"}
+
+INSTRUCCIONES:
+- Respondé en español argentino (vos/tu)
+- Sé conciso pero completo
+- Si no tenés datos suficientes, pedí más información
+- Siempre fundamentá tus recomendaciones con los datos del usuario
+- Usá formato con negritas y listas para facilitar la lectura`;
 
   const messages: AIMessage[] = [{ role: "system", content: systemPrompt }];
 

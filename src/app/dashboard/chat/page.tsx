@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
 import { ChatMessages } from "@/components/chat/chat-messages";
@@ -18,12 +18,22 @@ interface Message {
 
 export default function ChatPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialMessage = searchParams.get("q");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [initialSent, setInitialSent] = useState(false);
+
+  useEffect(() => {
+    if (initialMessage && !initialSent && !loading) {
+      setInitialSent(true);
+      handleSend(initialMessage);
+    }
+  }, [initialMessage, initialSent]);
 
   const loadConversation = useCallback(async (id: string) => {
     setActiveConversationId(id);
