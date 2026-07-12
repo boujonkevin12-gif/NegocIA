@@ -22,7 +22,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           collapsed={collapsed}
           onToggle={() => setCollapsed(!collapsed)}
         />
-        <main className="p-6">{children}</main>
+        <div className="flex">
+          <main className="flex-1 p-6 min-w-0">{children}</main>
+        </div>
       </div>
     </div>
   );

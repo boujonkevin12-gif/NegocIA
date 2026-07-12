@@ -6,6 +6,8 @@ export interface DashboardData {
   monthlyIncome: number;
   monthlyExpenses: number;
   balanceInsight: string;
+  investmentChange: number;
+  investmentValue: number;
   discoveries: { id: string; icon: string; text: string; type: "warning" | "tip" | "success" | "info" }[];
   goals: { id: string; name: string; icon: string; target: number; current: number; currency: string }[];
   subscriptions: { id: string; name: string; icon: string; amount: number; frequency: string; lastUsedAt: string | null; active: boolean }[];
@@ -46,6 +48,18 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
   const thisMonthExpenses = thisMonthTx.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0);
   const lastMonthIncome = lastMonthTx.filter((t) => t.type === "INCOME").reduce((s, t) => s + Number(t.amount), 0);
   const lastMonthExpenses = lastMonthTx.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + Number(t.amount), 0);
+
+  const investmentValue = investments.reduce(
+    (sum, i) => sum + Number(i.currentPrice ?? i.amount),
+    0
+  );
+  const investmentCost = investments.reduce(
+    (sum, i) => sum + Number(i.amount),
+    0
+  );
+  const investmentChange = investmentCost > 0
+    ? ((investmentValue - investmentCost) / investmentCost) * 100
+    : 0;
 
   const balance = thisMonthIncome - thisMonthExpenses;
   const previousBalance = lastMonthIncome - lastMonthExpenses;
@@ -165,6 +179,8 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     monthlyIncome: thisMonthIncome,
     monthlyExpenses: thisMonthExpenses,
     balanceInsight,
+    investmentChange,
+    investmentValue,
     discoveries: discoveries.slice(0, 6),
     goals: goals.map((g) => ({
       id: g.id,
