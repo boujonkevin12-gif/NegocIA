@@ -1,18 +1,25 @@
-import { DashboardGreeting } from "@/components/dashboard/greeting";
+import { auth } from "@/lib/auth";
+import { getDashboardInsights } from "@/lib/dashboard-insights";
+import { DashboardHero } from "@/components/dashboard/dashboard-hero";
 import { BalanceOverview } from "@/components/dashboard/balance-overview";
 import { IncomeExpenseChart } from "@/components/dashboard/income-expense-chart";
 import { SavingsTracker } from "@/components/dashboard/savings-tracker";
 import { InvestmentSummary } from "@/components/dashboard/investment-summary";
 import { FinancialGoals } from "@/components/dashboard/financial-goals";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
-import { QuickActions } from "@/components/dashboard/quick-actions";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  let insights: Awaited<ReturnType<typeof getDashboardInsights>> = [];
+  if (userId) {
+    insights = await getDashboardInsights(userId);
+  }
+
   return (
-    <div className="space-y-6">
-      <DashboardGreeting />
-
-      <QuickActions />
+    <div className="space-y-8">
+      <DashboardHero insights={insights} />
 
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-4">
