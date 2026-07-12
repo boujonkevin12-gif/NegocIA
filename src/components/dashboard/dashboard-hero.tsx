@@ -2,32 +2,39 @@
 
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Sparkles } from "lucide-react";
+import { MessageSquare, TrendingUp, TrendingDown } from "lucide-react";
 
 interface Insight {
   id: string;
   icon: string;
   text: string;
-  type: "opportunity" | "warning" | "info" | "success";
+  type: "opportunity" | "warning" | "info" | "success" | "tip";
 }
 
-const suggestions = [
-  { icon: "📊", label: "Analizar mis gastos", message: "Analizá mis gastos del último mes" },
-  { icon: "🚗", label: "¿Puedo comprar un auto?", message: "Con mi situación financiera actual, ¿puedo comprarme un auto?" },
-  { icon: "📈", label: "Ayudame a invertir", message: "Quiero empezar a invertir. ¿Dónde pongo mi dinero?" },
-  { icon: "🏢", label: "Quiero abrir un negocio", message: "Quiero abrir un negocio. ¿Me ayudás a analizar la viabilidad?" },
-  { icon: "📋", label: "¿Cómo reduzco impuestos?", message: "¿Cómo puedo reducir legalmente mis impuestos?" },
-  { icon: "💼", label: "Analizá mi empresa", message: "Analizá la situación financiera de mi empresa" },
-];
+interface FinancialAnalysisProps {
+  balance: number;
+  previousBalance: number;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+}
 
 const typeStyles: Record<string, string> = {
   opportunity: "border-l-emerald-500 bg-emerald-500/5",
   warning: "border-l-amber-500 bg-amber-500/5",
   info: "border-l-blue-500 bg-blue-500/5",
   success: "border-l-emerald-500 bg-emerald-500/5",
+  tip: "border-l-blue-500 bg-blue-500/5",
 };
 
-export function DashboardHero({ insights }: { insights: Insight[] }) {
+export function DashboardHero({
+  insights,
+  balance,
+  previousBalance,
+  monthlyIncome,
+  monthlyExpenses,
+}: {
+  insights: Insight[];
+} & FinancialAnalysisProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const name = session?.user?.name?.split(" ")[0] || "Usuario";
@@ -38,54 +45,98 @@ export function DashboardHero({ insights }: { insights: Insight[] }) {
   if (hour >= 5 && hour < 12) greeting = "Buenos días";
   else if (hour >= 12 && hour < 19) greeting = "Buenas tardes";
 
-  const handleSuggestion = (message: string) => {
-    router.push(`/dashboard/chat?q=${encodeURIComponent(message)}`);
-  };
+  const formatARS = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
+
+  const change =
+    previousBalance > 0
+      ? ((balance - previousBalance) / previousBalance) * 100
+      : 0;
+  const isUp = change >= 0;
+  const hasData = monthlyIncome > 0 || monthlyExpenses > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--header-height)-96px)] px-4">
-      <div className="w-full max-w-2xl space-y-10">
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-            <Sparkles className="h-3.5 w-3.5" />
-            NegocIA
-          </div>
+    <div className="animate-fade-in">
+      <div className="rounded-2xl border border-border/50 bg-card/30 p-8 space-y-6">
+        <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">
             {greeting}, {name} 👋
           </h1>
-          <p className="text-lg text-muted-foreground">
-            ¿Qué querés hacer hoy?
-          </p>
+          {insights.length > 0 && (
+            <p className="text-lg text-muted-foreground">
+              Hoy encontré{" "}
+              <span className="font-semibold text-foreground">
+                {insights.length} {insights.length === 1 ? "oportunidad" : "oportunidades"}
+              </span>{" "}
+              para vos.
+            </p>
+          )}
         </div>
 
         {insights.length > 0 && (
           <div className="space-y-2.5">
-            {insights.map((insight) => (
+            {insights.map((insight, i) => (
               <div
                 key={insight.id}
-                className={`flex items-start gap-3 rounded-xl border border-l-4 p-4 ${typeStyles[insight.type]}`}
+                className={`flex items-start gap-3 rounded-xl border border-l-4 p-4 animate-slide-up stagger-${i + 1} ${typeStyles[insight.type]}`}
               >
-                <span className="mt-0.5 text-lg">{insight.icon}</span>
-                <p className="text-sm leading-relaxed text-foreground/90">{insight.text}</p>
+                <span className="mt-0.5 text-lg shrink-0">{insight.icon}</span>
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  {insight.text}
+                </p>
               </div>
             ))}
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {suggestions.map((s) => (
-            <button
-              key={s.label}
-              onClick={() => handleSuggestion(s.message)}
-              className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary/50 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/5 active:scale-[0.98]"
-            >
-              <span className="text-xl">{s.icon}</span>
-              <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors">
-                {s.label}
-              </span>
-            </button>
-          ))}
-        </div>
+        {hasData && (
+          <div className="flex flex-wrap items-center gap-6 text-sm pt-2 border-t border-border/50">
+            <div>
+              <p className="text-muted-foreground text-xs">Balance</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xl font-bold tabular-nums">
+                  {formatARS(balance)}
+                </p>
+                {previousBalance > 0 && (
+                  <span
+                    className={`flex items-center gap-1 text-xs font-medium ${
+                      isUp ? "text-success" : "text-destructive"
+                    }`}
+                  >
+                    {isUp ? (
+                      <TrendingUp className="h-3 w-3" />
+                    ) : (
+                      <TrendingDown className="h-3 w-3" />
+                    )}
+                    {isUp ? "+" : ""}
+                    {change.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="h-8 w-px bg-border/50" />
+            <div>
+              <p className="text-muted-foreground text-xs">Ingresos</p>
+              <p className="font-semibold text-success">
+                {formatARS(monthlyIncome)}
+              </p>
+            </div>
+            <div className="h-8 w-px bg-border/50" />
+            <div>
+              <p className="text-muted-foreground text-xs">Gastos</p>
+              <p className="font-semibold text-destructive">
+                {formatARS(monthlyExpenses)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => router.push("/dashboard/chat")}
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98]"
+        >
+          <MessageSquare className="h-4 w-4" />
+          Ver recomendaciones
+        </button>
       </div>
     </div>
   );
