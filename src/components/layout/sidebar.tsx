@@ -9,14 +9,16 @@ import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
   MessageSquare,
-  Wallet,
-  TrendingUp,
-  Store,
-  FileText,
-  Target,
-  CreditCard,
+  Users,
+  DollarSign,
   Package,
   Calendar,
+  Wallet,
+  TrendingUp,
+  Landmark,
+  BarChart3,
+  Target,
+  CreditCard,
   Settings,
   LogOut,
   Sparkles,
@@ -39,19 +41,32 @@ const sections = [
   {
     title: "Gestión",
     items: [
-      { label: "Finanzas", href: "/dashboard/finances", icon: Wallet },
-      { label: "Inversiones", href: "/dashboard/investments", icon: TrendingUp },
-      { label: "Negocios", href: "/dashboard/business", icon: Store },
-      { label: "Reportes", href: "/dashboard/reports", icon: FileText },
+      { label: "Clientes", href: "/dashboard/clients", icon: Users },
+      { label: "Ventas", href: "/dashboard/sales", icon: DollarSign },
+      { label: "Productos", href: "/dashboard/products", icon: Package },
+      { label: "Agenda", href: "/dashboard/appointments", icon: Calendar },
     ] as NavItem[],
   },
   {
-    title: "Organización",
+    title: "Finanzas",
     items: [
-      { label: "Objetivos", href: "/dashboard/goals", icon: Target },
-      { label: "Suscripciones", href: "/dashboard/subscriptions", icon: CreditCard },
-      { label: "Stock", href: "/dashboard/stock", icon: Package },
-      { label: "Calendario", href: "/dashboard/calendar", icon: Calendar },
+      { label: "Finanzas", href: "/dashboard/finances", icon: Wallet },
+      { label: "Inversiones", href: "/dashboard/investments", icon: TrendingUp },
+      { label: "Bancos y Billeteras", href: "/dashboard/banks", icon: Landmark },
+    ] as NavItem[],
+  },
+  {
+    title: "Análisis",
+    items: [
+      { label: "Reportes", href: "/dashboard/reports", icon: BarChart3 },
+      { label: "Objetivos", href: "/dashboard", icon: Target },
+      { label: "Suscripciones", href: "/dashboard", icon: CreditCard },
+    ] as NavItem[],
+  },
+  {
+    title: "Sistema",
+    items: [
+      { label: "Configuración", href: "/dashboard/settings", icon: Settings },
     ] as NavItem[],
   },
 ];
@@ -195,17 +210,6 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
             <LogOut className="h-4 w-4" />
           </button>
         )}
-        <Link
-          href="/dashboard/settings"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors",
-            pathname.startsWith("/dashboard/settings") && "bg-primary/10 text-primary",
-            collapsed && "justify-center px-0"
-          )}
-        >
-          <Settings className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Configuración</span>}
-        </Link>
       </div>
     </aside>
   );
