@@ -20,6 +20,7 @@ import {
   Sparkles,
   Package,
   Megaphone,
+  PiggyBank,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -47,8 +48,8 @@ const sections = [
   {
     title: "FINANZAS",
     items: [
+      { label: "Centro Financiero", href: "/dashboard/financial", icon: PiggyBank },
       { label: "Bancos y Billeteras", href: "/dashboard/banks", icon: Landmark },
-      { label: "Finanzas", href: "/dashboard/finances", icon: Wallet },
       { label: "Inversiones", href: "/dashboard/investments", icon: TrendingUp },
     ] as NavItem[],
   },
