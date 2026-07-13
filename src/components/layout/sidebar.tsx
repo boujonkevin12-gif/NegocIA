@@ -4,24 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { Avatar } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
   MessageSquare,
   Users,
   DollarSign,
-  Package,
+  CreditCard,
   Calendar,
   Wallet,
   TrendingUp,
   Landmark,
   BarChart3,
-  Target,
-  CreditCard,
   Settings,
   LogOut,
   Sparkles,
+  Package,
+  Megaphone,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -29,42 +27,41 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
 }
 
 const mainItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Asistente IA", href: "/dashboard/chat", icon: MessageSquare, badge: "IA" },
+  { label: "IA", href: "/dashboard/chat", icon: MessageSquare },
 ];
 
 const sections = [
   {
-    title: "Gestión",
+    title: "GESTIÓN",
     items: [
       { label: "Clientes", href: "/dashboard/clients", icon: Users },
-      { label: "Ventas", href: "/dashboard/sales", icon: DollarSign },
-      { label: "Productos", href: "/dashboard/products", icon: Package },
       { label: "Agenda", href: "/dashboard/appointments", icon: Calendar },
+      { label: "Ventas", href: "/dashboard/sales", icon: DollarSign },
+      { label: "Cobros", href: "/dashboard/billing", icon: CreditCard },
     ] as NavItem[],
   },
   {
-    title: "Finanzas",
+    title: "FINANZAS",
     items: [
+      { label: "Bancos y Billeteras", href: "/dashboard/banks", icon: Landmark },
       { label: "Finanzas", href: "/dashboard/finances", icon: Wallet },
       { label: "Inversiones", href: "/dashboard/investments", icon: TrendingUp },
-      { label: "Bancos y Billeteras", href: "/dashboard/banks", icon: Landmark },
     ] as NavItem[],
   },
   {
-    title: "Análisis",
+    title: "NEGOCIO",
     items: [
+      { label: "Stock", href: "/dashboard/products", icon: Package },
+      { label: "Marketing", href: "/dashboard/chat", icon: Megaphone },
       { label: "Reportes", href: "/dashboard/reports", icon: BarChart3 },
-      { label: "Objetivos", href: "/dashboard", icon: Target },
-      { label: "Suscripciones", href: "/dashboard", icon: CreditCard },
     ] as NavItem[],
   },
   {
-    title: "Sistema",
+    title: "SISTEMA",
     items: [
       { label: "Configuración", href: "/dashboard/settings", icon: Settings },
     ] as NavItem[],
@@ -82,7 +79,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const userName = session?.user?.name || "Usuario";
-  const userEmail = session?.user?.email || "";
+  const userInitial = userName.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -93,30 +90,41 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-full flex-col border-r border-border bg-card/80 backdrop-blur-xl transition-all duration-300",
+        "fixed left-0 top-0 z-40 flex h-full flex-col transition-all duration-300 ease-in-out",
         collapsed ? "w-[68px]" : "w-[var(--sidebar-width)]"
       )}
+      style={{
+        background: "var(--sidebar-bg)",
+        borderRight: "1px solid var(--border)",
+      }}
     >
-      <div className="flex h-[var(--header-height)] items-center px-4">
+      {/* Logo */}
+      <div className="flex h-[var(--header-height)] items-center px-5">
         {!collapsed && (
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
+          <Link href="/dashboard" className="flex items-center gap-3 group">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/30 transition-transform duration-200 group-hover:scale-110">
+              <Sparkles className="h-4.5 w-4.5 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-tight">NegocIA</span>
+            <div className="flex flex-col">
+              <span className="text-[15px] font-bold tracking-tight text-white">
+                NegocIA
+              </span>
+              <span className="text-[10px] font-medium text-muted-foreground">
+                Asistente financiero
+              </span>
+            </div>
           </Link>
         )}
         {collapsed && (
-          <Link href="/dashboard" className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
+          <Link href="/dashboard" className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/30">
+            <Sparkles className="h-4.5 w-4.5 text-white" />
           </Link>
         )}
       </div>
 
-      <Separator />
-
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-        <div className="space-y-0.5">
+      {/* Main nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        <div className="space-y-1">
           {mainItems.map((item) => {
             const isActive =
               item.href === "/dashboard"
@@ -126,25 +134,10 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                  collapsed && "justify-center px-0"
-                )}
+                className={cn("sidebar-item", isActive && "active")}
               >
-                <item.icon className={cn("h-5 w-5 shrink-0", isActive && "text-primary")} />
-                {!collapsed && (
-                  <>
-                    <span className="flex-1">{item.label}</span>
-                    {item.badge && (
-                      <span className="rounded-md bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary uppercase">
-                        {item.badge}
-                      </span>
-                    )}
-                  </>
-                )}
+                <item.icon className="h-[18px] w-[18px] shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
               </Link>
             );
           })}
@@ -153,26 +146,18 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
         {sections.map((section) => (
           <div key={section.title}>
             {!collapsed && (
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                {section.title}
-              </p>
+              <p className="section-label">{section.title}</p>
             )}
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {section.items.map((item) => {
                 const isActive = pathname.startsWith(item.href);
                 return (
                   <Link
-                    key={item.href}
+                    key={item.href + item.label}
                     href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-                      collapsed && "justify-center px-0"
-                    )}
+                    className={cn("sidebar-item", isActive && "active")}
                   >
-                    <item.icon className={cn("h-4 w-4 shrink-0", isActive && "text-primary")} />
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
                     {!collapsed && <span>{item.label}</span>}
                   </Link>
                 );
@@ -182,20 +167,26 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
         ))}
       </nav>
 
-      <Separator />
-
-      <div className="space-y-1 px-3 py-4">
+      {/* User */}
+      <div
+        className="mx-3 mb-3 rounded-xl p-3 transition-colors"
+        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}
+      >
         {!collapsed && (
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-            <Avatar name={userName} size="sm" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
+              {userInitial}
+            </div>
             <div className="flex flex-1 flex-col overflow-hidden">
-              <span className="text-sm font-medium truncate">{userName}</span>
-              <span className="text-xs text-muted-foreground truncate">{userEmail}</span>
+              <span className="text-sm font-medium text-white truncate">{userName}</span>
+              <span className="text-xs text-muted-foreground truncate">
+                {session?.user?.email || ""}
+              </span>
             </div>
             <button
               onClick={handleLogout}
               disabled={loggingOut}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -205,7 +196,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex w-full items-center justify-center rounded-lg py-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex w-full items-center justify-center rounded-lg py-2 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
           >
             <LogOut className="h-4 w-4" />
           </button>
