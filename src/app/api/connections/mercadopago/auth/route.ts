@@ -7,20 +7,24 @@ export async function GET() {
     return NextResponse.redirect(new URL("/login", process.env.NEXTAUTH_URL || "http://localhost:3000"));
   }
 
-  const clientId = process.env.MP_CLIENT_ID || process.env.MP_PUBLIC_KEY;
-  if (!clientId) {
-    return NextResponse.json({ error: "MP_CLIENT_ID no configurado" }, { status: 500 });
+  const clientId = process.env.MP_CLIENT_ID;
+  const clientSecret = process.env.MP_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return NextResponse.redirect(
+      new URL("/dashboard/banks?error=mp_not_configured", process.env.NEXTAUTH_URL || "http://localhost:3000")
+    );
   }
 
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
   const redirectUri = `${baseUrl}/api/connections/mercadopago/callback`;
 
-  const authUrl = new URL("https://www.mercadopago.com.ar/authorization");
+  const authUrl = new URL("https://auth.mercadopago.com/authorization");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("platform_id", "mp");
-  authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("state", session.user.id);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
 
   return NextResponse.redirect(authUrl.toString());
 }
