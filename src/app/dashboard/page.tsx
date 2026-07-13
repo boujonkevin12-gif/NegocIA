@@ -61,6 +61,8 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    fetch("/api/connections/auto-sync", { method: "POST" }).catch(() => {});
   }, []);
 
   const kpis = stats

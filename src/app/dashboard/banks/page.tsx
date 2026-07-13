@@ -24,6 +24,15 @@ import {
   AlertCircle,
   Clock,
   Shield,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  BarChart3,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownRight,
+  Info,
+  CircleDollarSign,
 } from "lucide-react";
 
 interface ProviderOption {
@@ -60,6 +69,43 @@ interface Connection {
   createdAt: string;
 }
 
+interface MPSyncStats {
+  totalPayments: number;
+  totalAmount: number;
+  todayCount: number;
+  todayAmount: number;
+  weekCount: number;
+  weekAmount: number;
+  monthCount: number;
+  monthAmount: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  refunded: number;
+}
+
+interface MPPayment {
+  id: number;
+  status: string;
+  statusDetail: string;
+  amount: number;
+  currency: string;
+  description: string;
+  dateCreated: string;
+  dateApproved: string | null;
+  type: string;
+  method: string;
+  collectorEmail: string;
+}
+
+interface MPSyncData {
+  syncedAt: string;
+  user: { id: number; firstName: string; lastName: string; email: string; siteId: string } | null;
+  stats: MPSyncStats;
+  recentPayments: MPPayment[];
+  limitations: { balance: string; investments: string };
+}
+
 type View = "list" | "select-provider";
 
 const STATUS_CONFIG: Record<Connection["status"], { label: string; variant: "success" | "warning" | "destructive" | "secondary"; icon: React.ReactNode }> = {
@@ -70,6 +116,45 @@ const STATUS_CONFIG: Record<Connection["status"], { label: string; variant: "suc
   DISCONNECTED: { label: "Desconectada", variant: "secondary", icon: <AlertCircle className="h-3.5 w-3.5" /> },
 };
 
+const PAYMENT_STATUS: Record<string, { label: string; variant: "success" | "warning" | "destructive" | "secondary" }> = {
+  approved: { label: "Aprobado", variant: "success" },
+  pending: { label: "Pendiente", variant: "warning" },
+  rejected: { label: "Rechazado", variant: "destructive" },
+  cancelled: { label: "Cancelado", variant: "destructive" },
+  refunded: { label: "Reembolsado", variant: "secondary" },
+  in_process: { label: "En proceso", variant: "warning" },
+  authorized: { label: "Autorizado", variant: "success" },
+};
+
+const PAYMENT_TYPE: Record<string, string> = {
+  credit_card: "Tarjeta de crédito",
+  debit_card: "Tarjeta de débito",
+  bank_transfer: "Transferencia",
+  cash: "Efectivo",
+  account_money: "Billetera MP",
+  ticket: "Ticket/Cupón",
+  prepaid_card: "Tarjeta prepaga",
+  atm: "Cajero automático",
+};
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatShortDate(isoDate: string): string {
+  return new Date(isoDate).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function BanksPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -79,8 +164,8 @@ export default function BanksPage() {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Connection | null>(null);
+  const [mpData, setMpData] = useState<MPSyncData | null>(null);
 
-  // Handle OAuth callback results
   useEffect(() => {
     const connected = searchParams.get("connected");
     const error = searchParams.get("error");
@@ -91,7 +176,6 @@ export default function BanksPage() {
         description: `${connected === "mercadopago" ? "Mercado Pago" : connected} conectada correctamente`,
         variant: "success",
       });
-      // Clean URL
       window.history.replaceState({}, "", "/dashboard/banks");
     }
 
@@ -130,11 +214,9 @@ export default function BanksPage() {
 
   function handleConnect(provider: ProviderOption) {
     if (provider.authType === "oauth") {
-      // Redirect to OAuth initiation
       setConnecting(provider.id);
       window.location.href = `/api/connections/${provider.id}/auth`;
     } else {
-      // For non-OAuth providers, show coming soon
       toast({
         title: "Próximamente",
         description: `La conexión con ${provider.name} estará disponible pronto`,
@@ -146,12 +228,24 @@ export default function BanksPage() {
   async function handleSync(id: string) {
     setSyncingId(id);
     try {
-      const res = await fetch(`/api/connections/${id}/sync`, { method: "POST" });
-      if (!res.ok) {
+      const conn = connections.find((c) => c.id === id);
+      if (conn?.providerId === "mercadopago") {
+        const res = await fetch("/api/connections/mercadopago/sync", { method: "POST" });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Error al sincronizar");
+        }
         const data = await res.json();
-        throw new Error(data.error || "Error al sincronizar");
+        setMpData(data);
+        toast({ title: "Sincronizado", description: "Datos de MercadoPago actualizados", variant: "success" });
+      } else {
+        const res = await fetch(`/api/connections/${id}/sync`, { method: "POST" });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Error al sincronizar");
+        }
+        toast({ title: "Sincronizada", description: "Datos actualizados correctamente", variant: "success" });
       }
-      toast({ title: "Sincronizada", description: "Datos actualizados correctamente", variant: "success" });
       await fetchConnections();
     } catch (err) {
       toast({
@@ -171,6 +265,7 @@ export default function BanksPage() {
       if (!res.ok) throw new Error("Error al desconectar");
       toast({ title: "Desconectada", description: `${deleteTarget.label} desconectada`, variant: "success" });
       setDeleteTarget(null);
+      if (deleteTarget.providerId === "mercadopago") setMpData(null);
       await fetchConnections();
     } catch {
       toast({ title: "Error", description: "No se pudo desconectar la cuenta", variant: "error" });
@@ -188,6 +283,7 @@ export default function BanksPage() {
   }
 
   const bankConnections = connections.filter((c) => c.providerType === "BANK" && c.status !== "DISCONNECTED");
+  const mpConnection = bankConnections.find((c) => c.providerId === "mercadopago");
 
   return (
     <div className="space-y-6">
@@ -291,81 +387,219 @@ export default function BanksPage() {
               action={{ label: "Conectar cuenta", onClick: () => setView("select-provider") }}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {bankConnections.map((conn) => {
                 const statusCfg = STATUS_CONFIG[conn.status] ?? STATUS_CONFIG.PENDING;
+                const isMP = conn.providerId === "mercadopago";
+                const stats = mpData?.stats;
+
                 return (
-                  <div
-                    key={conn.id}
-                    className="rounded-2xl p-5 transition-all duration-200"
-                    style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Provider icon */}
-                      <div
-                        className="flex h-14 w-14 items-center justify-center rounded-xl shrink-0"
-                        style={{ background: "rgba(124, 58, 237, 0.1)" }}
-                      >
-                        <span className="text-primary">{getProviderIcon(conn.providerId)}</span>
+                  <div key={conn.id} className="space-y-4">
+                    <div
+                      className="rounded-2xl p-5 transition-all duration-200"
+                      style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className="flex h-14 w-14 items-center justify-center rounded-xl shrink-0"
+                          style={{ background: "rgba(124, 58, 237, 0.1)" }}
+                        >
+                          <span className="text-primary">{getProviderIcon(conn.providerId)}</span>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-base font-semibold text-white">{conn.label}</p>
+                            <Badge variant={statusCfg.variant} className="flex items-center gap-1">
+                              {statusCfg.icon}
+                              {statusCfg.label}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{getProviderName(conn.providerId)}</p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            <span>
+                              {conn.lastSyncAt
+                                ? `Última sync: ${new Date(conn.lastSyncAt).toLocaleDateString("es-AR")} ${new Date(conn.lastSyncAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}`
+                                : "Sin sincronizar"}
+                            </span>
+                            <span>•</span>
+                            <span>
+                              Conectada: {new Date(conn.createdAt).toLocaleDateString("es-AR")}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSync(conn.id)}
+                            disabled={syncingId === conn.id}
+                            className="rounded-xl"
+                          >
+                            {syncingId === conn.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
+                            <span className="hidden sm:inline">Sincronizar ahora</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                            onClick={() => setDeleteTarget(conn)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-base font-semibold text-white">{conn.label}</p>
-                          <Badge variant={statusCfg.variant} className="flex items-center gap-1">
-                            {statusCfg.icon}
-                            {statusCfg.label}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{getProviderName(conn.providerId)}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>
-                            {conn.lastSyncAt
-                              ? `Última sync: ${new Date(conn.lastSyncAt).toLocaleDateString("es-AR")}`
-                              : "Sin sincronizar"}
-                          </span>
-                          <span>•</span>
-                          <span>
-                            Conectada: {new Date(conn.createdAt).toLocaleDateString("es-AR")}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSync(conn.id)}
-                          disabled={syncingId === conn.id}
-                          className="rounded-xl"
+                      {conn.lastError && (
+                        <div
+                          className="mt-3 rounded-xl p-3 flex items-start gap-2"
+                          style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px solid rgba(239, 68, 68, 0.1)" }}
                         >
-                          {syncingId === conn.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-3.5 w-3.5" />
-                          )}
-                          <span className="hidden sm:inline">Sincronizar</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
-                          onClick={() => setDeleteTarget(conn)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                          <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                          <p className="text-xs text-destructive">{conn.lastError}</p>
+                        </div>
+                      )}
                     </div>
 
-                    {conn.lastError && (
-                      <div
-                        className="mt-3 rounded-xl p-3 flex items-start gap-2"
-                        style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px solid rgba(239, 68, 68, 0.1)" }}
-                      >
-                        <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                        <p className="text-xs text-destructive">{conn.lastError}</p>
+                    {isMP && stats && (
+                      <div className="space-y-4 animate-fade-in">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <StatCard
+                            icon={<BarChart3 className="h-4 w-4" />}
+                            label="Cobros totales"
+                            value={String(stats.totalPayments)}
+                            sub={formatCurrency(stats.totalAmount)}
+                            color="primary"
+                          />
+                          <StatCard
+                            icon={<Calendar className="h-4 w-4" />}
+                            label="Hoy"
+                            value={String(stats.todayCount)}
+                            sub={formatCurrency(stats.todayAmount)}
+                            color="success"
+                          />
+                          <StatCard
+                            icon={<TrendingUp className="h-4 w-4" />}
+                            label="Esta semana"
+                            value={String(stats.weekCount)}
+                            sub={formatCurrency(stats.weekAmount)}
+                            color="info"
+                          />
+                          <StatCard
+                            icon={<DollarSign className="h-4 w-4" />}
+                            label="Este mes"
+                            value={String(stats.monthCount)}
+                            sub={formatCurrency(stats.monthAmount)}
+                            color="warning"
+                          />
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-4">
+                          <MiniStat label="Aprobados" value={stats.approved} variant="success" />
+                          <MiniStat label="Pendientes" value={stats.pending} variant="warning" />
+                          <MiniStat label="Rechazados" value={stats.rejected} variant="destructive" />
+                          <MiniStat label="Reembolsados" value={stats.refunded} variant="secondary" />
+                        </div>
+
+                        <div
+                          className="rounded-xl p-3 flex items-start gap-2"
+                          style={{ background: "rgba(124, 58, 237, 0.05)", border: "1px solid rgba(124, 58, 237, 0.1)" }}
+                        >
+                          <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <p><strong className="text-white">Saldo:</strong> {mpData.limitations.balance}</p>
+                            <p><strong className="text-white">Inversiones:</strong> {mpData.limitations.investments}</p>
+                          </div>
+                        </div>
+
+                        {mpData.recentPayments.length > 0 && (
+                          <div
+                            className="rounded-2xl overflow-hidden"
+                            style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+                          >
+                            <div className="px-5 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
+                              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                                <CircleDollarSign className="h-4 w-4 text-primary" />
+                                Últimos cobros
+                              </h3>
+                            </div>
+                            <div className="divide-y" style={{ borderColor: "var(--glass-border)" }}>
+                              {mpData.recentPayments.map((p) => {
+                                const statusCfg = PAYMENT_STATUS[p.status] ?? { label: p.status, variant: "secondary" as const };
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className="px-5 py-3 flex items-center gap-4 hover:bg-white/[0.02] transition-colors"
+                                  >
+                                    <div
+                                      className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+                                      style={{
+                                        background: p.status === "approved"
+                                          ? "rgba(34, 197, 94, 0.1)"
+                                          : p.status === "pending"
+                                          ? "rgba(234, 179, 8, 0.1)"
+                                          : "rgba(239, 68, 68, 0.1)",
+                                      }}
+                                    >
+                                      {p.status === "approved" ? (
+                                        <ArrowUpRight className="h-4 w-4 text-success" />
+                                      ) : p.status === "pending" ? (
+                                        <Clock className="h-4 w-4 text-warning" />
+                                      ) : (
+                                        <ArrowDownRight className="h-4 w-4 text-destructive" />
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium text-white truncate">
+                                          {p.description || "Pago"}
+                                        </p>
+                                        <Badge variant={statusCfg.variant} className="text-[10px] shrink-0">
+                                          {statusCfg.label}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs text-muted-foreground">
+                                          {PAYMENT_TYPE[p.type] ?? p.type}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">•</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {formatShortDate(p.dateCreated)}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                      <p className={`text-sm font-semibold ${p.status === "approved" ? "text-success" : p.status === "pending" ? "text-warning" : "text-destructive"}`}>
+                                        {p.status === "approved" ? "+" : ""}{formatCurrency(p.amount)}
+                                      </p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        {p.currency}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Última sincronización: {mpData.syncedAt ? formatShortDate(mpData.syncedAt) : "—"}
+                          </span>
+                          {mpData.user && (
+                            <span>
+                              {mpData.user.firstName} {mpData.user.lastName} • {mpData.user.email}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -386,6 +620,65 @@ export default function BanksPage() {
         cancelText="Cancelar"
         variant="danger"
       />
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  sub,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  color: string;
+}) {
+  const colorMap: Record<string, string> = {
+    primary: "rgba(124, 58, 237, 0.1)",
+    success: "rgba(34, 197, 94, 0.1)",
+    info: "rgba(59, 130, 246, 0.1)",
+    warning: "rgba(234, 179, 8, 0.1)",
+  };
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <div
+          className="flex h-7 w-7 items-center justify-center rounded-lg"
+          style={{ background: colorMap[color] ?? colorMap.primary }}
+        >
+          <span className={`text-${color}`}>{icon}</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+      <p className="text-xl font-bold text-white">{value}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, variant }: { label: string; value: number; variant: string }) {
+  const variantColor: Record<string, string> = {
+    success: "text-success",
+    warning: "text-warning",
+    destructive: "text-destructive",
+    secondary: "text-muted-foreground",
+  };
+
+  return (
+    <div
+      className="rounded-xl p-3 text-center"
+      style={{ background: "var(--glass-bg)", border: "1px solid var(--glass-border)" }}
+    >
+      <p className={`text-lg font-bold ${variantColor[variant] ?? "text-white"}`}>{value}</p>
+      <p className="text-[11px] text-muted-foreground">{label}</p>
     </div>
   );
 }

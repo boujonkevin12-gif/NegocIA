@@ -182,7 +182,7 @@ class MercadoPagoProvider implements FinancialProvider {
       params.end_date = new Date().toISOString();
     }
 
-    const data = await this.mpFetch("/v1/payments", access_token, params);
+    const data = await this.mpFetch("/v1/payments/search", access_token, params);
 
     if (!data.results) return [];
 
